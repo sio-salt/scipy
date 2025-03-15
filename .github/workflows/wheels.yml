@@ -19,10 +19,13 @@ on:
   - cron: "9  9 * * *"
   push:
     branches:
+      - main
+      - annealing_edit
       - maintenance/**
   pull_request:
     branches:
       - main
+      - annealing_edit
       - maintenance/**
   workflow_dispatch:
 
@@ -37,7 +40,7 @@ jobs:
   get_commit_message:
     name: Get commit message
     runs-on: ubuntu-latest
-    if: github.repository == 'scipy/scipy'
+    # if: github.repository == 'scipy/scipy'
     outputs:
       message: ${{ steps.commit_message.outputs.message }}
     steps:
