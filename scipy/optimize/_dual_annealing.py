@@ -213,15 +213,12 @@ class EnergyState:
         self.ebest = e
         self.xbest = np.copy(x)
 
-        # call callback func after local search, so do not call here
-
-        # if self.callback is not None:
-        #     val = self.callback(x, e, context)
-        #     if val is not None:
-        #         if val:
-        #             return (
-        #                 "Callback function requested to stop early by " "returning True"
-        #             )
+    def call_the_callback(self, e, x, context, *args, **kwargs):
+        if self.callback is not None:
+            val = self.callback(x, e, context, *args, **kwargs)
+            if val is not None:
+                if val:
+                    return "Callback function requested to stop early by returning True"
 
     def update_current(self, e, x):
         self.current_energy = e
@@ -311,7 +308,7 @@ class StrategyChain:
                 self.emin = self.energy_state.current_energy
                 self.xmin = np.copy(self.energy_state.current_location)
 
-    def run(self, step, temperature):
+    def run(self, step, temperature, iteration):
         self.temperature_step = temperature / float(step + 1)
         self.not_improved_idx += 1
         for j in range(self.energy_state.current_location.size * 2):
@@ -329,25 +326,36 @@ class StrategyChain:
                 # We have got a better energy value
                 self.energy_state.update_current(e, x_visit)
                 if e < self.energy_state.ebest:
-
-                    # official scipy implementation
-                    # val = self.energy_state.update_best(e, x_visit, 0)
-                    # if val is not None:
-                    #     if val:
-                    #         return val
-
-                    # after local search, always call callback func, do not call callback in update_best
                     self.energy_state.update_best(e, x_visit, 0)
+                    val = self.energy_state.call_the_callback(
+                        e,
+                        x_visit,
+                        0,
+                        msg="LS improved to best",
+                        step=step,
+                        temperature=temperature,
+                    )
+                    if val is not None:
+                        if val:
+                            return val
                     self.energy_state_improved = True
                     self.not_improved_idx = 0
+                else:
+                    self.energy_state.call_the_callback(
+                        e, x_visit, 0, msg="LS improved but not best"
+                    )
             else:
                 # We have not improved but do we accept the new location?
+                self.energy_state.call_the_callback(
+                    e, x_visit, 0, msg="LS no improvement"
+                )
                 self.accept_reject(j, e, x_visit)
+
             if self.func_wrapper.nfev >= self.func_wrapper.maxfun:
                 return "Maximum number of function call reached " "during annealing"
         # End of StrategyChain loop
 
-    def local_search(self):
+    def local_search(self, step, temperature, iteration):
         # Decision making for performing a local search
         # based on strategy chain results
         # If energy has been improved or no improvement since too long,
@@ -357,34 +365,35 @@ class StrategyChain:
             e, x = self.minimizer_wrapper.local_search(
                 self.energy_state.xbest, self.energy_state.ebest
             )
-
-            # official scipy implementation
-            # if e < self.energy_state.ebest:
-            #     self.not_improved_idx = 0
-            #     val = self.energy_state.update_best(e, x, 1)
-            #     if val is not None:
-            #         if val:
-            #             return val
-            #     self.energy_state.update_current(e, x)
-
-            # after local search, always call callback func
-            if self.energy_state.callback is not None:
-                val = self.energy_state.callback(x, e, 1)
-                if val is not None:
-                    if val:
-                        return (
-                            "Callback function requested to stop early by "
-                            "returning True"
-                        )
-
             if e < self.energy_state.ebest:
                 self.not_improved_idx = 0
                 self.energy_state.update_best(e, x, 1)
+                val = self.energy_state.call_the_callback(
+                    e,
+                    x,
+                    1,
+                    msg="LS improved",
+                    step=step,
+                    temperature=temperature,
+                    iteration=iteration,
+                )
+                if val is not None:
+                    if val:
+                        return val
                 self.energy_state.update_current(e, x)
+            else:
+                self.energy_state.call_the_callback(
+                    e,
+                    x,
+                    1,
+                    msg="LS no improvement",
+                    step=step,
+                    temperature=temperature,
+                    iteration=iteration,
+                )
 
             if self.func_wrapper.nfev >= self.func_wrapper.maxfun:
-                return "Maximum number of function call reached during local search"
-
+                return "Maximum number of function call reached " "during local search"
         # Check probability of a need to perform a LS even if no improvement
         do_ls = False
         if self.K < 90 * len(self.energy_state.current_location):
@@ -405,21 +414,31 @@ class StrategyChain:
             self.emin = e
             self.not_improved_idx = 0
             self.not_improved_max_idx = self.energy_state.current_location.size
-
-            # call callback func after local search
-            if self.energy_state.callback is not None:
-                val = self.energy_state.callback(x, e, 2)
-                if val is not None:
-                    if val:
-                        return (
-                            "Callback function requested to stop early by "
-                            "returning True"
-                        )
-
-            # update state if improved
             if e < self.energy_state.ebest:
                 self.energy_state.update_best(self.emin, self.xmin, 2)
+                self.energy_state.call_the_callback(
+                    self.emin,
+                    self.xmin,
+                    2,
+                    msg="LS improved",
+                    step=step,
+                    temperature=temperature,
+                    iteration=iteration,
+                )
+                if val is not None:
+                    if val:
+                        return val
                 self.energy_state.update_current(e, x)
+            else:
+                self.energy_state.call_the_callback(
+                    self.emin,
+                    self.xmin,
+                    2,
+                    msg="LS no improvement",
+                    step=step,
+                    temperature=temperature,
+                    iteration=iteration,
+                )
             if self.func_wrapper.nfev >= self.func_wrapper.maxfun:
                 return (
                     "Maximum number of function call reached " "during dual annealing"
@@ -678,7 +697,7 @@ def dual_annealing(
     References
     ----------
     .. [1] Tsallis C. Possible generalization of Boltzmann-Gibbs
-        statistics. Journal of Statistical Physics, 52, 479-487 (1988).
+        statistics. Journal of Statistical Physics, 52, 479-487 (1998).
     .. [2] Tsallis C, Stariolo DA. Generalized Simulated Annealing.
         Physica A, 233, 395-406 (1996).
     .. [3] Xiang Y, Sun DY, Fan W, Gong XG. Generalized Simulated
@@ -790,7 +809,9 @@ def dual_annealing(
                 energy_state.reset(func_wrapper, rng_gen)
                 break
             # starting strategy chain
-            val = strategy_chain.run(i, temperature)
+            val = strategy_chain.run(
+                step=i, temperature=temperature, iteration=iteration
+            )
             if val is not None:
                 message.append(val)
                 need_to_stop = True
@@ -798,7 +819,10 @@ def dual_annealing(
                 break
             # Possible local search at the end of the strategy chain
             if not no_local_search:
-                val = strategy_chain.local_search()
+                # give important annealing parameters that changes in this loop to local_search() to give to callback
+                val = strategy_chain.local_search(
+                    step=i, temperature=temperature, iteration=iteration
+                )
                 if val is not None:
                     message.append(val)
                     need_to_stop = True
