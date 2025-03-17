@@ -331,7 +331,7 @@ class StrategyChain:
                         e,
                         x_visit,
                         0,
-                        msg="LS improved to best",
+                        msg="Chain improved to best",
                         step=step,
                         temperature=temperature,
                     )
@@ -342,17 +342,27 @@ class StrategyChain:
                     self.not_improved_idx = 0
                 else:
                     self.energy_state.call_the_callback(
-                        e, x_visit, 0, msg="LS improved but not best"
+                        e,
+                        x_visit,
+                        0,
+                        msg="Chain improved",
+                        step=step,
+                        temperature=temperature,
                     )
             else:
                 # We have not improved but do we accept the new location?
                 self.energy_state.call_the_callback(
-                    e, x_visit, 0, msg="LS no improvement"
+                    e,
+                    x_visit,
+                    0,
+                    msg="Chain no improvement",
+                    step=step,
+                    temperature=temperature,
                 )
                 self.accept_reject(j, e, x_visit)
 
             if self.func_wrapper.nfev >= self.func_wrapper.maxfun:
-                return "Maximum number of function call reached " "during annealing"
+                return "Maximum number of function call reached during annealing"
         # End of StrategyChain loop
 
     def local_search(self, step, temperature, iteration):
@@ -372,7 +382,7 @@ class StrategyChain:
                     e,
                     x,
                     1,
-                    msg="LS improved",
+                    msg="Local search improved to best",
                     step=step,
                     temperature=temperature,
                     iteration=iteration,
@@ -386,14 +396,14 @@ class StrategyChain:
                     e,
                     x,
                     1,
-                    msg="LS no improvement",
+                    msg="Local search improved",
                     step=step,
                     temperature=temperature,
                     iteration=iteration,
                 )
 
             if self.func_wrapper.nfev >= self.func_wrapper.maxfun:
-                return "Maximum number of function call reached " "during local search"
+                return "Maximum number of function call reached during local search"
         # Check probability of a need to perform a LS even if no improvement
         do_ls = False
         if self.K < 90 * len(self.energy_state.current_location):
@@ -416,11 +426,11 @@ class StrategyChain:
             self.not_improved_max_idx = self.energy_state.current_location.size
             if e < self.energy_state.ebest:
                 self.energy_state.update_best(self.emin, self.xmin, 2)
-                self.energy_state.call_the_callback(
+                val = self.energy_state.call_the_callback(
                     self.emin,
                     self.xmin,
                     2,
-                    msg="LS improved",
+                    msg="Local search improved to best",
                     step=step,
                     temperature=temperature,
                     iteration=iteration,
@@ -429,6 +439,16 @@ class StrategyChain:
                     if val:
                         return val
                 self.energy_state.update_current(e, x)
+            elif e < self.energy_state.current_energy:
+                self.energy_state.call_the_callback(
+                    self.emin,
+                    self.xmin,
+                    2,
+                    msg="Local search improved",
+                    step=step,
+                    temperature=temperature,
+                    iteration=iteration,
+                )
             else:
                 self.energy_state.call_the_callback(
                     self.emin,
@@ -441,7 +461,7 @@ class StrategyChain:
                 )
             if self.func_wrapper.nfev >= self.func_wrapper.maxfun:
                 return (
-                    "Maximum number of function call reached " "during dual annealing"
+                    "Maximum number of function call reached during dual annealing"
                 )
 
 
