@@ -41,9 +41,10 @@ class TestDualAnnealing:
         self.nb_fun_call = threading.local()
         self.ngev = threading.local()
 
-    def callback(self, x, f, context, *args, **kwargs):
+    def callback(self, *args, **kwargs):
         # For testing callback mechanism. Should stop for e <= 1 as
         # the callback function returns True
+        f = kwargs["f"]
         if f <= 1.0:
             return True
 

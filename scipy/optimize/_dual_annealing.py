@@ -213,9 +213,9 @@ class EnergyState:
         self.ebest = e
         self.xbest = np.copy(x)
 
-    def call_the_callback(self, e, x, context, *args, **kwargs):
+    def call_the_callback(self, *args, **kwargs):
         if self.callback is not None:
-            val = self.callback(x, e, context, *args, **kwargs)
+            val = self.callback(*args, **kwargs)
             if val is not None:
                 if val:
                     return "Callback function requested to stop early by returning True"
@@ -328,9 +328,9 @@ class StrategyChain:
                 if e < self.energy_state.ebest:
                     self.energy_state.update_best(e, x_visit, 0)
                     val = self.energy_state.call_the_callback(
-                        e,
-                        x_visit,
-                        0,
+                        f=e,
+                        x=x_visit,
+                        context=0,
                         msg="Chain improved to best",
                         step=step,
                         temperature=temperature,
@@ -342,9 +342,9 @@ class StrategyChain:
                     self.not_improved_idx = 0
                 else:
                     self.energy_state.call_the_callback(
-                        e,
-                        x_visit,
-                        0,
+                        f=e,
+                        x=x_visit,
+                        context=0,
                         msg="Chain improved",
                         step=step,
                         temperature=temperature,
@@ -352,9 +352,9 @@ class StrategyChain:
             else:
                 # We have not improved but do we accept the new location?
                 self.energy_state.call_the_callback(
-                    e,
-                    x_visit,
-                    0,
+                    f=e,
+                    x=x_visit,
+                    context=0,
                     msg="Chain no improvement",
                     step=step,
                     temperature=temperature,
@@ -379,9 +379,9 @@ class StrategyChain:
                 self.not_improved_idx = 0
                 self.energy_state.update_best(e, x, 1)
                 val = self.energy_state.call_the_callback(
-                    e,
-                    x,
-                    1,
+                    f=e,
+                    x=x,
+                    context=1,
                     msg="Local search improved to best",
                     step=step,
                     temperature=temperature,
@@ -393,9 +393,9 @@ class StrategyChain:
                 self.energy_state.update_current(e, x)
             else:
                 self.energy_state.call_the_callback(
-                    e,
-                    x,
-                    1,
+                    f=e,
+                    x=x,
+                    context=1,
                     msg="Local search improved",
                     step=step,
                     temperature=temperature,
@@ -427,9 +427,9 @@ class StrategyChain:
             if e < self.energy_state.ebest:
                 self.energy_state.update_best(self.emin, self.xmin, 2)
                 val = self.energy_state.call_the_callback(
-                    self.emin,
-                    self.xmin,
-                    2,
+                    f=self.emin,
+                    x=self.xmin,
+                    context=2,
                     msg="Local search improved to best",
                     step=step,
                     temperature=temperature,
@@ -441,9 +441,9 @@ class StrategyChain:
                 self.energy_state.update_current(e, x)
             elif e < self.energy_state.current_energy:
                 self.energy_state.call_the_callback(
-                    self.emin,
-                    self.xmin,
-                    2,
+                    f=self.emin,
+                    x=self.xmin,
+                    context=2,
                     msg="Local search improved",
                     step=step,
                     temperature=temperature,
@@ -451,9 +451,9 @@ class StrategyChain:
                 )
             else:
                 self.energy_state.call_the_callback(
-                    self.emin,
-                    self.xmin,
-                    2,
+                    f=self.emin,
+                    x=self.xmin,
+                    context=2,
                     msg="LS no improvement",
                     step=step,
                     temperature=temperature,
